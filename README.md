@@ -97,7 +97,61 @@ Spring Cloud стоит быть созданным с помощью Spring Boo
 
 
 ## Spring Cloud Config Server 
+
+![image](https://user-images.githubusercontent.com/47852430/134276063-bc29e249-6b5e-4aac-9064-b3b0a68a7586.png)
+
+Зачем нужен конфиг сервер в распределенном приложении? Что бы не хардкодить конфигурационные файлы в приложении, потому что тогда придется пересобирать и разворачивать заного всю среду, это является сложной задачей в среде распределенного приложения.
+
+Идея разрешения проблемы - это нужно иметь приложение, управляющее конфигуряциями для другим приложений, которое работает независимо на сервере.
+
+![image](https://user-images.githubusercontent.com/47852430/134276402-e3471cd2-5516-4e72-8b63-c24181ae389b.png)
+
+Когда вы меняете конфиги на конфиг-сервере, вы хотите оповестить об этом клиентов и Spring Cloud Bus предоставляет механизм оповещения клиентов, что есть изменение и требует обновить новую информацию. 
+
+![image](https://user-images.githubusercontent.com/47852430/134276529-d368a99a-e7f7-408b-aa8c-9f5c7271619f.png)
+
+### Как сохраняет данные Config Server? 
+
+Есть 2 способа
+  - Сохранить на жестком диске сервера
+  - Использовать Git или SVN
+
+### Создание Config Server
+
+Создаем Spring Boot приложение с зависимостью Spring Cloud Config Server
+
+        @EnableConfigServer
+        @SpringBootApplication
+        public class SpringCloudConfigServerApplication {
+          public static void main(String[] args) {
+            SpringApplication.run(SpringCloudConfigServerApplication.class, args);
+          }
+        }
+
+В application.properties выставляем путь к конфигам.   
+      
+        server.port=8888
+        spring.cloud.config.server.git.uri=https://github.com/firsss21/spring-cloud-config-git-repo-example.git
+
+        #system file
+        #spring.profiles.active=native
+        #spring.cloud.config.server.native.searchLocations=C:/Users/firsss/Desktop/config
+
+И перейдя по http://localhost:8888/spring-cloud-hello-service.properties получим наш конфиг
+
 ## Spring Cloud Config Client
+
+Как приложение может получить свою информацию конфигурации, управляемое на Config-Server?
+
+В нашем Spring Boot приложении с зависимостью Spring Cloud Config Server, в файле properties/bootstrap.properties выставляем адресс Config Server и application name.
+
+      spring.application.name = app
+      spring.cloud.config.uri=http://host-config-server:8888
+      
+Для такого названия приложения нам нужен файл app.properties среди хранимых нашим Config Server конфигах.
+
+И теперь мы можем получать конфигурационные переменные как и обычно, через `@Value("${spring.datasource.url}")`, только для начала вешаем на наш Bean @RefreshScope (Аннотация @RefreshScope используется для загрузки значения свойств конфигурации с сервера конфигурации, любой Spring Bean аннотированный с помощью @RefreshScope будет обновлен во время запуска (runtime))
+
 ## Spring Cloud Eureka Server
 ## Spring Cloud Discovery Eurika Client
 ## Spring Cloud балансировка
