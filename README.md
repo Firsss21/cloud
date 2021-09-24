@@ -79,6 +79,8 @@ Netflix решил, что их инновации могут оказаться
 
 ![image](https://user-images.githubusercontent.com/47852430/134101141-55677c0f-ff99-4877-b4c2-0363083fcd7a.png)
 
+------
+
 ## Spring Cloud Overview
 
 Spring как платформа построенная для разработки веб приложений на Java. Впервые представлена в 2004, в 2006 появились подпроекты, каждый подпроект фокусируется на разную индустрию. 
@@ -95,6 +97,7 @@ Spring Cloud стоит быть созданным с помощью Spring Boo
 
 ![image](https://user-images.githubusercontent.com/47852430/134103035-cd0de4d8-2b72-4d7e-9e27-8d0eba4731ba.png)
 
+------
 
 ## Spring Cloud Config Server 
 
@@ -120,13 +123,15 @@ Spring Cloud стоит быть созданным с помощью Spring Boo
 
 Создаем Spring Boot приложение с зависимостью Spring Cloud Config Server
 
-        @EnableConfigServer
-        @SpringBootApplication
-        public class SpringCloudConfigServerApplication {
-          public static void main(String[] args) {
-            SpringApplication.run(SpringCloudConfigServerApplication.class, args);
-          }
-        }
+```java
+@EnableConfigServer
+@SpringBootApplication
+public class SpringCloudConfigServerApplication {
+  public static void main(String[] args) {
+    SpringApplication.run(SpringCloudConfigServerApplication.class, args);
+  }
+}
+```
 
 В application.properties выставляем путь к конфигам.   
       
@@ -152,7 +157,147 @@ Spring Cloud стоит быть созданным с помощью Spring Boo
 
 И теперь мы можем получать конфигурационные переменные как и обычно, через `@Value("${spring.datasource.url}")`, только для начала вешаем на наш Bean @RefreshScope (Аннотация @RefreshScope используется для загрузки значения свойств конфигурации с сервера конфигурации, любой Spring Bean аннотированный с помощью @RefreshScope будет обновлен во время запуска (runtime))
 
-## Spring Cloud Eureka Server
-## Spring Cloud Discovery Eurika Client
+------
+
+## Service Registration
+
+При создании распределенной системы, которая сосотит из разных приложений, независимо работяющий на разных серверах, вам нужно что бы данные приложения могли разговаривать друг с другом, для этого они должны **найти** друг друга. Когда они найдут друг друга, они смогут взаимодействовать, поэтому нужен какой-то сервер, помогающий этим приложениям зарегистрировать свое существование. 
+
+![image](https://user-images.githubusercontent.com/47852430/134442546-fd9926d5-2039-42ed-898b-04e6b2102824.png)
+
+Все приложения в распределенной системе должны зарегистрироваться с **Service Registration**
+![image](https://user-images.githubusercontent.com/47852430/134442642-935caf4b-96f5-46af-b902-cb67f06e2276.png)
+
+Есть несколько технологий для **Service Registration**, Spring Cloud предоставляет следующие решения:
+- Eureka
+- Zookepeer
+- Cloud Foundry
+- Consul
+
+### Spring Cloud Eureka Server
+  
+- Cоздадим **Service Registration** используя **Spring Cloud Eureka Server**
+- Запустим и посмотрим **Eureka Monitor**
+- Создание реплик приложения для демонстрации работы распределенной системы
+
+- **Создаем Service Registration**
+
+Запускаем Spring Boot приложение с зависимостью Eureka Server. Помечаем дополнительной аннотацией `@EnableEurekaServer`
+
+```java
+@EnableEurekaServer
+@SpringBootApplication
+public class EurekaserverApplication {
+public static void main(String[] args) {
+  SpringApplication.run(EurekaserverApplication.class, args);
+}
+}
+```
+
+```yml
+spring:
+  profiles: default
+server:
+  port: 9999
+eureka:
+  instance:
+    hostname: eureka-server.ru
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+      ---
+spring:
+  profiles: one
+  application:
+    name: eureka-server-clustered
+server:
+  port: 9001  
+eureka:
+  instance:
+    hostname: eureka-server-one.ru    
+  client:
+    registerWithEureka: true
+    fetchRegistry: true        
+    serviceUrl:
+      defaultZone: http://eureka-server-two.ru:9002/eureka/,http://eureka-server-three.ru:9003/eureka/
+
+---
+spring:
+  profiles: two
+  application:
+    name: eureka-server-clustered
+server:
+  port: 9002
+eureka:
+  instance:
+    hostname: eureka-server-two.ru      
+  client:
+    registerWithEureka: true
+    fetchRegistry: true        
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka/,http://eureka-server-three.ru:9003/eureka/
+
+---
+spring:
+  profiles: three
+  application:
+    name: eureka-server-clustered   
+server:
+  port: 9003
+eureka:
+  instance:
+    hostname: eureka-server-three.ru    
+  client:
+    registerWithEureka: true
+    fetchRegistry: true    
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka/,http://eureka-server-two.ru:9002/eureka/   
+       
+```
+- **Eureka Monitor**
+Eureka Monitor (Eureka Монитор) позволяет вам видеть список приложений работающих и зарегистрированных с данным Eureka Server, одновременно позволяет вам видеть реплики данного приложения, которые работают на распределенной системе
+
+Переходим по ссылке http://localhost:9999/
+
+- **Создание реплик приложения**
+
+Запускаем реплики приложения для демонстрации работы распределенной системы, конфиги которых описаны в **yml** конфиге,
+
+```bash
+java -jar -Dspring.profiles.active=one target/eurekaserver-0.0.1-SNAPSHOT.jar
+java -jar -Dspring.profiles.active=two target/eurekaserver-0.0.1-SNAPSHOT.jar
+java -jar -Dspring.profiles.active=three target/eurekaserver-0.0.1-SNAPSHOT.jar
+```
+Если выполняем локально и для примера, то дополнительно нужно обновить файл **hosts**
+
+![image](https://user-images.githubusercontent.com/47852430/134612398-39609442-20e9-4196-b94f-2948a286ccfe.png)
+
+Теперь перейдя по новым хостам мы можем увидеть созданные нами репликации и их статус.
+
+![image](https://user-images.githubusercontent.com/47852430/134612620-232c2343-929b-4ffb-8eb9-0c426c181c5d.png)
+
+## Spring Cloud Discovery Eureka Client
+
+Создадим приложение, которое будет являться клиентом (**Eureka client**) нашего **Service Registration **(Eureka Server)**, после чего наш **Eureka Client** сможет получить других клиентов, подключенных к сервису и мы сможем взаимодействовать с ним через наше приложение.
+
+Запускаем **Spring Boot** приложение с зависимостью **Eureka Discovery Client**. Помечаем дополнительной аннотацией `@EnableEurekaServer`
+
+```java
+@EnableEurekaClient
+@SpringBootApplication
+public class EurekaClientApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(EurekaClientApplication.class, args);
+    }
+}
+
+```
+
+```yml
+
+```
+
 ## Spring Cloud балансировка
 
