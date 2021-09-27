@@ -295,9 +295,161 @@ public class EurekaClientApplication {
 
 ```
 
+Создаем в конфиге yml несколько реплик одного приложения 
 ```yml
 
+spring:
+  application:
+    name: TEST-SERVICE
+
+---
+eureka:
+  instance:
+    appname: TEST-SERVICE
+  client:
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka
+server:
+  port: 7000
+
+---
+spring:
+  profiles: test-replica1
+eureka:
+  instance:
+    appname: TEST-SERVICE
+  client:
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka
+server:
+  port: 8001
+
+---
+spring:
+  profiles: test-replica2
+eureka:
+  instance:
+    appname: TEST-SERVICE
+  client:
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka
+server:
+  port: 8002
+
+---
+spring:
+  profiles: test-replica3
+eureka:
+  instance:
+    appname: TEST-SERVICE
+  client:
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka
+server:
+  port: 8003
+
+---
+spring:
+  profiles: test-replica4
+eureka:
+  instance:
+    appname: TEST-SERVICE
+  client:
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka
+server:
+  port: 8004
+
+---
+spring:
+  profiles: test-replica5
+eureka:
+  instance:
+    appname: TEST-SERVICE
+  client:
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka
+server:
+  port: 8005
 ```
+
+Собираем и запускаем все реплики
+
+```bash
+mvn package
+java -jar -Dspring.profiles.active=test-replica1 target/eureka-client-0.0.1-SNAPSHOT.jar
+java -jar -Dspring.profiles.active=test-replica2 target/eureka-client-0.0.1-SNAPSHOT.jar
+java -jar -Dspring.profiles.active=test-replica3 target/eureka-client-0.0.1-SNAPSHOT.jar
+java -jar -Dspring.profiles.active=test-replica4 target/eureka-client-0.0.1-SNAPSHOT.jar
+java -jar -Dspring.profiles.active=test-replica5 target/eureka-client-0.0.1-SNAPSHOT.jar
+```
+Заходим на наш **Eureka Server** и видим все запущенные реплики.
+![image](https://user-images.githubusercontent.com/47852430/134833726-4334f06e-7f87-4ca1-bb41-56564dc005a6.png)
+
 
 ## Spring Cloud балансировка
 
+Что такое **Load Balancer**? Если у вашего распределенной системы множество приложений, работающих на разных компьютеах и количество пользователей большое - то приложение обычно создает разные реплики, которые работают на разных компьютерах. В это время появляется **Load Balancer** (Балансировка нагрузки), который помогает распределить входящий траффик поравну между репликами. 
+
+![image](https://user-images.githubusercontent.com/47852430/134837029-98e38d27-6626-49a6-8a23-0be6fe7210bb.png)
+
+### Балансировка на стороне сервера (Server Side Load Balancer)
+
+Балансировка нагрузки расположена на стороне сервера, когда запросы поступают от клиента они приведут к балансировке и определит один сервер для этого запроса. Самый простой алгоритм используемый балансировщиком - случайное распределение. 
+Почти все балансировки нагрузки являются аппаратным обеспечением, инегрирующим программным, которые контролируют балансировку нагрузки. 
+
+![gif](https://s1.o7planning.com/ru/11739/images/15621620.gif)
+
+Например: Nginx
+
+### Балансировка на стороне клиента (Client Side Load Balancer)
+
+Когда балансировка нагрузки находится на стороне **клиента**, она сама решает какому серверу отправить запрос, основываясь на некоторых критериях.
+
+![image](https://user-images.githubusercontent.com/47852430/134837154-37dd6ab7-30fd-409e-a991-799dfdda4432.png)
+
+Балансировка на клиентской стороне обычно отправляет запросы к серверам одной зоны (Zone), или имеет быстрый ответ.
+
+Сервера отличаются по следующим критериям:
+
+- Доступность (Avialability)
+- Производительность (Performance)
+- Месторасположение. Сервера могут быть в разных странах
+
+### Netflix Ribbon
+
+**Ribbon** это часть семьи Netflix Open Source Software, который является библиотекой, предоставляющей балансировку на клиентской стороне. 
+Т.к он является частью **Netflix OSS** то он может автоматически взимодействовать с **Netflix Service Discovery (Eureka)**. 
+
+**Spring Cloud** создал **API**, чтоб помочь легко использовать библиотеки **Ribbon**
+
+Главные принципы, связанные с **Ribbon**:
+
+- **Список серверов.**
+
+Список серверов, которые могут предоставить определенную услугу для 1 **Client**.
+Например: Client 1 нужна информация про погоду, то тогда будет список серверов, которые могут предоставить данную информацию. Данный список включает сервера напрямую конфигурированные в приложении Client и сервера, которые Client нашел.
+
+- **Фильтрованный список серверов**
+
+После получения списка серверов, этот фильтр отбросит медленные или недоступные сервера.
+
+- **Балансировка нагрузки**
+
+Ribbon - балансировка нагрузки, является компонентом, расположенном на стороне клиента, он решает как сервер будет вызван (из списка фильтрованных серверов).
+
+Т.е. имеются некоторые стратегии для решения. Обычно основываются на **Rule Component** что бы создать настоящее решение.
+
+По умолчанию **Spring Cloud Ribbon** использует стратегию **ZoneAwareLoadBalancer**, которая направляет на сервера в одной зоне с клиентом.
+
+**Rule Component** - умный модуль, который создает решение **Вызывать или не вызывать**. По умлочанию Spring Cloud использует правило **ZoneAvoidanceRule**.
+
+- **Ping**
+
+**Ping** - способ, который использует **Client** для быстрой проверки работает ли на тот момент сервер или нет. Поведение по умолчанию у Spring Cloud это уполномочить **Eureka** автоматически проверять данную информацию, но Spring Cloud позволяет кастомизировать проверку по вашему.
