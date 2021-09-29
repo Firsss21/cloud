@@ -521,9 +521,9 @@ public class RibbonConfiguration {
     
 }
 ```
-И контроллер, которым мы можем проверить 
-```
+И контроллер, через который мы воспользуемся балансером проверить 
 
+```java
 @RestController
 public class Controller {
 
@@ -583,9 +583,7 @@ public class Controller {
 
 ## Spring Cloud LoadBalancer
 
-https://spring.io/guides/gs/spring-cloud-loadbalancer/
-
-todo..
+[todo..](https://spring.io/guides/gs/spring-cloud-loadbalancer/)
 
 ## Предохранитель (circuit breaker)
 
