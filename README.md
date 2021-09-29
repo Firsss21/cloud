@@ -422,7 +422,7 @@ java -jar -Dspring.profiles.active=test-replica5 target/eureka-client-0.0.1-SNAP
 - Производительность (Performance)
 - Месторасположение. Сервера могут быть в разных странах
 
-### Netflix Ribbon
+### Netflix Ribbon (deprecated)
 
 **Ribbon** это часть семьи Netflix Open Source Software, который является библиотекой, предоставляющей балансировку на клиентской стороне. 
 Т.к он является частью **Netflix OSS** то он может автоматически взимодействовать с **Netflix Service Discovery (Eureka)**. 
@@ -467,6 +467,123 @@ Ribbon - балансировка нагрузки, является компо�
 Для демонстрации балансера, создадим 5 реплик ABC Service.
 
 ![image](https://user-images.githubusercontent.com/47852430/135018983-064781ae-c55c-4dc5-b6d8-de275194a791.png)
+
+Создадим Spring Boot приложение c зависимостью **Ribbon**
+
+main
+```java
+@RibbonClient(name = "ping-a-server", configuration = RibbonConfiguration.class)
+@EnableEurekaClient
+@SpringBootApplication
+public class BalancingApplication {
+	public static void main(String[] args) {
+		SpringApplication.run(BalancingApplication.class, args);
+	}
+}
+```
+application yml
+```yml
+
+spring:
+  application:
+    name: XYZ-SERVICE
+server:
+  port: 9100
+
+ping-server:
+  ribbon:
+    eureka:
+      enabled: false # Disable Default Ping
+    listOfServers: localhost:8000,localhost:8001,localhost:8002,localhost:8003
+    ServerListRefreshInterval: 15000
+eureka:
+  instance:
+    appname: XYZ-SERVICE
+  client:
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-server-one.ru:9001/eureka
+```
+ribbon config 
+```java
+public class RibbonConfiguration {
+    
+    @Autowired
+    private IClientConfig ribbonClientConfig;
+    @Bean
+    public IPing ribbonPing(IClientConfig config) {
+        return new PingUrl();
+    }
+    @Bean
+    public IRule ribbonRule(IClientConfig config) {
+        return new WeightedResponseTimeRule();
+    }
+    
+}
+```
+И контроллер, которым мы можем проверить 
+```
+
+@RestController
+public class Controller {
+
+    @Autowired
+    private DiscoveryClient discoveryClient;
+
+    @Autowired
+    private LoadBalancerClient loadBalancer;
+
+    @ResponseBody
+    @RequestMapping(value = "/test", method = RequestMethod.GET)
+    public String showFirstService() {
+
+        String serviceId = "ABC-SERVICE".toLowerCase();
+        List<ServiceInstance> instances = this.discoveryClient.getInstances(serviceId);
+
+        if (instances == null || instances.isEmpty()) {
+            return "No instances for service: " + serviceId;
+        }
+        
+        String html = "<h2>Instances for Service Id: " + serviceId + "</h2>";
+
+        for (ServiceInstance serviceInstance : instances) {
+            html += "<h3>Instance :" + serviceInstance.getUri() + "</h3>";
+        }
+
+        // Create a RestTemplate.
+        RestTemplate restTemplate = new RestTemplate();
+
+        html += "<br><h4>Call /hello of service: " + serviceId + "</h4>";
+
+        try {
+      
+            ServiceInstance serviceInstance = this.loadBalancer.choose(serviceId);
+
+            html += "<br>===> Load Balancer choose: " + serviceInstance.getUri();
+
+            String url = "http://" + serviceInstance.getHost() + ":" + serviceInstance.getPort() + "/hello";
+
+            html += "<br>Make a Call: " + url;
+            html += "<br>";
+
+            String result = restTemplate.getForObject(url, String.class);
+
+            html += "<br>Result: " + result;
+        } catch (IllegalStateException e) {
+            html += "<br>loadBalancer.choose ERROR: " + e.getMessage();
+            e.printStackTrace();
+        } catch (Exception e) {
+            html += "<br>Other ERROR: " + e.getMessage();
+            e.printStackTrace();
+        }
+        return html;
+    }
+}
+```
+
+## Spring Cloud LoadBalancer
+
+https://spring.io/guides/gs/spring-cloud-loadbalancer/
 
 todo..
 
