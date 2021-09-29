@@ -468,3 +468,8 @@ Ribbon - балансировка нагрузки, является компо�
 
 ![image](https://user-images.githubusercontent.com/47852430/135018983-064781ae-c55c-4dc5-b6d8-de275194a791.png)
 
+todo..
+
+## Предохранитель (circuit breaker)
+
+todo.. 
